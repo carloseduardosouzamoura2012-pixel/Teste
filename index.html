@@ -1,10 +1,158 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Meu Site</title>
+<meta charset="UTF-8">
+<title>GitHub Site Creator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{
+background:#0d1117;
+color:white;
+font-family:Arial;
+text-align:center;
+padding:20px;
+}
+textarea,input{
+width:95%;
+padding:10px;
+margin:8px 0;
+border-radius:8px;
+border:none;
+}
+button{
+padding:10px 15px;
+border:none;
+border-radius:8px;
+background:#238636;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+#status{
+margin-top:15px;
+}
+</style>
 </head>
 <body>
-<h1>Meu Site Funcionando 🚀</h1>
-<p>Criado automaticamente!</p>
+
+<h2>🚀 GitHub Site Creator</h2>
+
+<input id="token" type="password" placeholder="Cole seu token (repo)">
+<input id="repo" placeholder="Nome do repositório">
+<textarea id="conteudo" rows="8" placeholder="HTML do site"></textarea>
+
+<button onclick="criar()">Criar / Atualizar Site</button>
+
+<p id="status"></p>
+
+<script>
+async function criar(){
+let token=document.getElementById("token").value.trim();
+let repo=document.getElementById("repo").value.trim();
+let conteudo=document.getElementById("conteudo").value;
+let status=document.getElementById("status");
+
+if(!token||!repo||!conteudo){
+alert("Preencha todos os campos");
+return;
+}
+
+status.innerHTML="🔄 Verificando usuário...";
+
+try{
+
+// pegar usuário
+let userRes=await fetch("https://api.github.com/user",{
+headers:{Authorization:"token "+token}
+});
+
+if(!userRes.ok){
+status.innerHTML="❌ Token inválido";
+return;
+}
+
+let userData=await userRes.json();
+let usuario=userData.login;
+
+// criar repo (se não existir)
+status.innerHTML="📁 Criando repositório...";
+
+await fetch("https://api.github.com/user/repos",{
+method:"POST",
+headers:{
+Authorization:"token "+token,
+Accept:"application/vnd.github+json"
+},
+body:JSON.stringify({
+name:repo,
+private:false
+})
+});
+
+// pegar SHA se já existir index
+let sha=null;
+
+let fileCheck=await fetch(
+`https://api.github.com/repos/${usuario}/${repo}/contents/index.html`,
+{headers:{Authorization:"token "+token}}
+);
+
+if(fileCheck.ok){
+let fileData=await fileCheck.json();
+sha=fileData.sha;
+}
+
+// subir index.html
+status.innerHTML="⬆️ Enviando arquivos...";
+
+await fetch(
+`https://api.github.com/repos/${usuario}/${repo}/contents/index.html`,
+{
+method:"PUT",
+headers:{
+Authorization:"token "+token,
+Accept:"application/vnd.github+json"
+},
+body:JSON.stringify({
+message:"Deploy automático",
+content:btoa(unescape(encodeURIComponent(conteudo))),
+sha:sha
+})
+}
+);
+
+// ativar pages
+status.innerHTML="🌍 Ativando GitHub Pages...";
+
+await fetch(
+`https://api.github.com/repos/${usuario}/${repo}/pages`,
+{
+method:"POST",
+headers:{
+Authorization:"token "+token,
+Accept:"application/vnd.github+json"
+},
+body:JSON.stringify({
+source:{branch:"main",path:"/"}
+})
+}
+);
+
+status.innerHTML=`
+✅ Site publicado!<br><br>
+<a style="color:#58a6ff"
+href="https://${usuario}.github.io/${repo}"
+target="_blank">
+Abrir Site
+</a>
+`;
+
+}catch(e){
+status.innerHTML="❌ Erro: "+e.message;
+}
+
+}
+</script>
+
 </body>
 </html>
