@@ -1,109 +1,58 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Zap Web</title>
+<title>Zap Web PRO</title>
 <style>
-body{
-margin:0;
-font-family:Arial;
-background:#0b141a;
-color:white;
-}
-
-.container{
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
-}
-
-.box{
-background:#111b21;
-padding:25px;
-border-radius:12px;
-width:300px;
-text-align:center;
-}
-
-input{
-width:100%;
-padding:10px;
-margin:10px 0;
-border-radius:6px;
-border:none;
-}
-
-button{
-background:#25D366;
-border:none;
-padding:10px;
-width:100%;
-border-radius:6px;
-font-weight:bold;
-cursor:pointer;
-}
-
-.chat{
-display:none;
-height:100vh;
-flex-direction:column;
-}
-
-.header{
-background:#202c33;
-padding:15px;
-font-weight:bold;
-}
-
-.messages{
-flex:1;
-padding:10px;
-overflow-y:auto;
-}
-
-.message{
-background:#005c4b;
-padding:8px;
-border-radius:8px;
-margin:5px 0;
-max-width:70%;
-}
-
-.input-area{
-display:flex;
-padding:10px;
-background:#202c33;
-}
-
-.input-area input{
-flex:1;
-margin:0;
-margin-right:5px;
-}
-
+body{margin:0;font-family:Arial;background:#0b141a;color:white;}
+.hidden{display:none;}
+.container{display:flex;justify-content:center;align-items:center;height:100vh;}
+.box{background:#111b21;padding:25px;border-radius:12px;width:300px;text-align:center;}
+input, select{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:none;}
+button{background:#25D366;border:none;padding:10px;width:100%;border-radius:6px;font-weight:bold;cursor:pointer;}
+.chatApp{display:none;height:100vh;flex-direction:row;}
+.contacts{width:30%;background:#111b21;border-right:1px solid #333;overflow-y:auto;}
+.contact{padding:12px;border-bottom:1px solid #333;cursor:pointer;display:flex;align-items:center;}
+.contact img{width:35px;height:35px;border-radius:50%;margin-right:10px;}
+.contact:hover{background:#202c33;}
+.activeContact{background:#202c33;}
+.messagesArea{flex:1;display:flex;flex-direction:column;}
+.header{background:#202c33;padding:15px;font-weight:bold;display:flex;justify-content:space-between;align-items:center;}
+.status{font-size:12px;color:#ccc;}
+.messages{flex:1;padding:10px;overflow-y:auto;}
+.message{background:#005c4b;padding:8px;border-radius:8px;margin:5px 0;max-width:70%;}
+.message.me{background:#25D366;align-self:flex-end;}
+.input-area{display:flex;padding:10px;background:#202c33;}
+.input-area input{flex:1;margin-right:5px;padding:10px;border-radius:6px;border:none;}
+.invite-area{margin-top:10px;}
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div class="container" id="loginBox">
 <div class="box">
 <h2>Entrar</h2>
-
 <input type="text" id="phone" placeholder="Número">
-
+<input type="text" id="name" placeholder="Nome">
 <button onclick="sendCode()">Enviar código</button>
-
 <input type="text" id="code" placeholder="Digite o código">
-
 <button onclick="verifyCode()">Verificar</button>
-
 <p id="msg"></p>
 </div>
 </div>
 
-<div class="chat" id="chatArea">
-<div class="header">Zap Web</div>
+<!-- CHAT APP -->
+<div class="chatApp" id="chatApp">
+<div class="contacts" id="contactsList">
+<h3 style="padding:10px;">Contatos</h3>
+</div>
+
+<div class="messagesArea">
+<div class="header">
+<span id="chatHeader">Chat</span>
+<span class="status" id="statusText"></span>
+</div>
 
 <div class="messages" id="messages"></div>
 
@@ -111,59 +60,159 @@ margin-right:5px;
 <input type="text" id="chatInput" placeholder="Digite uma mensagem">
 <button onclick="sendMessage()">Enviar</button>
 </div>
+
+<div class="invite-area">
+<input type="text" id="inviteLink" readonly placeholder="Link para convidar contato">
+</div>
 </div>
 
 <script>
 
+// ======= SISTEMA =======
+
+// Usuários e chats
 let generatedCode;
+let currentContact = null;
+let currentUser = null;
 
-function sendCode(){
-let phone = document.getElementById("phone").value;
-
-if(phone.length < 8){
-document.getElementById("msg").innerText = "Número inválido";
-return;
+if(!localStorage.getItem("users")){
+    localStorage.setItem("users", JSON.stringify([]));
+}
+if(!localStorage.getItem("chats")){
+    localStorage.setItem("chats", JSON.stringify({}));
 }
 
-generatedCode = Math.floor(100000 + Math.random() * 900000);
-
-alert("Seu código é: " + generatedCode);
-
-document.getElementById("msg").innerText = "Código gerado!";
+// ======= LOGIN =======
+function sendCode(){
+    let phone = document.getElementById("phone").value;
+    let name = document.getElementById("name").value.trim();
+    if(phone.length < 4 || !name){
+        document.getElementById("msg").innerText = "Número ou nome inválido";
+        return;
+    }
+    generatedCode = Math.floor(100000 + Math.random()*900000);
+    alert("Seu código é: " + generatedCode);
+    document.getElementById("msg").innerText = "Código gerado!";
 }
 
 function verifyCode(){
-let code = document.getElementById("code").value;
-
-if(code == generatedCode){
-localStorage.setItem("logged","true");
-startChat();
-}else{
-document.getElementById("msg").innerText = "Código errado!";
+    let code = document.getElementById("code").value;
+    if(code == generatedCode){
+        let phone = document.getElementById("phone").value;
+        let name = document.getElementById("name").value.trim();
+        currentUser = {phone,name,status:"online",avatar:"https://i.pravatar.cc/35?u="+phone};
+        let users = JSON.parse(localStorage.getItem("users"));
+        if(!users.find(u=>u.phone==phone)) users.push(currentUser);
+        localStorage.setItem("users", JSON.stringify(users));
+        localStorage.setItem("loggedUser", JSON.stringify(currentUser));
+        startApp();
+    } else {
+        document.getElementById("msg").innerText = "Código errado!";
+    }
 }
+
+// ======= APP =======
+function startApp(){
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("chatApp").style.display="flex";
+    currentUser = JSON.parse(localStorage.getItem("loggedUser"));
+    renderContacts();
+    checkInvite();
 }
 
-function startChat(){
-document.getElementById("loginBox").style.display = "none";
-document.getElementById("chatArea").style.display = "flex";
+function renderContacts(){
+    let list = document.getElementById("contactsList");
+    list.innerHTML = '<h3 style="padding:10px;">Contatos</h3>';
+    let users = JSON.parse(localStorage.getItem("users")).filter(u=>u.phone!=currentUser.phone);
+    users.forEach(u=>{
+        let div = document.createElement("div");
+        div.className="contact";
+        div.innerHTML = `<img src="${u.avatar}"> ${u.name}`;
+        div.onclick = ()=>selectContact(u);
+        list.appendChild(div);
+    });
+}
+
+function selectContact(u){
+    currentContact = u;
+    document.getElementById("chatHeader").innerText = u.name;
+    document.getElementById("statusText").innerText = u.status;
+    document.querySelectorAll(".contact").forEach(el=>el.classList.remove("activeContact"));
+    // Marca ativo
+    Array.from(document.querySelectorAll(".contact")).find(el=>el.innerText.includes(u.name)).classList.add("activeContact");
+    renderMessages();
+    createInviteLink(u);
+}
+
+// ======= CHATS =======
+function getChats(){return JSON.parse(localStorage.getItem("chats"));}
+function renderMessages(){
+    if(!currentContact) return;
+    let chats = getChats();
+    let key = currentUser.phone + "_" + currentContact.phone;
+    if(!chats[key]) chats[key]=[];
+    localStorage.setItem("chats",JSON.stringify(chats));
+    let container = document.getElementById("messages");
+    container.innerHTML="";
+    chats[key].forEach(m=>{
+        let div=document.createElement("div");
+        div.className="message "+(m.me?"me":"");
+        div.innerText=m.text;
+        container.appendChild(div);
+    });
+    container.scrollTop = container.scrollHeight;
 }
 
 function sendMessage(){
-let input = document.getElementById("chatInput");
-let msg = input.value;
-
-if(msg.trim() === "") return;
-
-let div = document.createElement("div");
-div.className = "message";
-div.innerText = msg;
-
-document.getElementById("messages").appendChild(div);
-input.value = "";
+    if(!currentContact) return;
+    let input=document.getElementById("chatInput");
+    let msg = input.value.trim();
+    if(!msg) return;
+    let chats = getChats();
+    let key = currentUser.phone + "_" + currentContact.phone;
+    chats[key].push({text:msg,me:true});
+    localStorage.setItem("chats",JSON.stringify(chats));
+    input.value="";
+    renderMessages();
+    simulateReply();
 }
 
-if(localStorage.getItem("logged") === "true"){
-startChat();
+function simulateReply(){
+    setTimeout(()=>{
+        if(!currentContact) return;
+        let chats = getChats();
+        let key = currentUser.phone + "_" + currentContact.phone;
+        chats[key].push({text:"Resposta de "+currentContact.name,me:false});
+        localStorage.setItem("chats",JSON.stringify(chats));
+        renderMessages();
+    },1000);
+}
+
+// ======= STATUS =======
+setInterval(()=>{
+    if(currentContact) document.getElementById("statusText").innerText = Math.random()<0.1?"digitando...":"online";
+},2000);
+
+// ======= CONVITE =======
+function createInviteLink(u){
+    let linkBox=document.getElementById("inviteLink");
+    linkBox.value = window.location.href + "?invite=" + u.phone;
+}
+
+// Checa se link de convite existe
+function checkInvite(){
+    const params = new URLSearchParams(window.location.search);
+    const invitePhone = params.get("invite");
+    if(invitePhone && currentUser.phone!=invitePhone){
+        let users = JSON.parse(localStorage.getItem("users"));
+        let user = users.find(u=>u.phone==invitePhone);
+        if(user) selectContact(user);
+    }
+}
+
+// ======= AUTO LOGIN =======
+if(localStorage.getItem("loggedUser")){
+    startApp();
 }
 
 </script>
