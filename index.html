@@ -2,156 +2,170 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>GitHub Site Creator</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zap Web</title>
 <style>
 body{
-background:#0d1117;
-color:white;
+margin:0;
 font-family:Arial;
-text-align:center;
-padding:20px;
-}
-textarea,input{
-width:95%;
-padding:10px;
-margin:8px 0;
-border-radius:8px;
-border:none;
-}
-button{
-padding:10px 15px;
-border:none;
-border-radius:8px;
-background:#238636;
+background:#0b141a;
 color:white;
+}
+
+.container{
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+.box{
+background:#111b21;
+padding:25px;
+border-radius:12px;
+width:300px;
+text-align:center;
+}
+
+input{
+width:100%;
+padding:10px;
+margin:10px 0;
+border-radius:6px;
+border:none;
+}
+
+button{
+background:#25D366;
+border:none;
+padding:10px;
+width:100%;
+border-radius:6px;
 font-weight:bold;
 cursor:pointer;
 }
-#status{
-margin-top:15px;
+
+.chat{
+display:none;
+height:100vh;
+flex-direction:column;
 }
+
+.header{
+background:#202c33;
+padding:15px;
+font-weight:bold;
+}
+
+.messages{
+flex:1;
+padding:10px;
+overflow-y:auto;
+}
+
+.message{
+background:#005c4b;
+padding:8px;
+border-radius:8px;
+margin:5px 0;
+max-width:70%;
+}
+
+.input-area{
+display:flex;
+padding:10px;
+background:#202c33;
+}
+
+.input-area input{
+flex:1;
+margin:0;
+margin-right:5px;
+}
+
 </style>
 </head>
 <body>
 
-<h2>🚀 GitHub Site Creator</h2>
+<div class="container" id="loginBox">
+<div class="box">
+<h2>Entrar</h2>
 
-<input id="token" type="password" placeholder="Cole seu token (repo)">
-<input id="repo" placeholder="Nome do repositório">
-<textarea id="conteudo" rows="8" placeholder="HTML do site"></textarea>
+<input type="text" id="phone" placeholder="Número">
 
-<button onclick="criar()">Criar / Atualizar Site</button>
+<button onclick="sendCode()">Enviar código</button>
 
-<p id="status"></p>
+<input type="text" id="code" placeholder="Digite o código">
+
+<button onclick="verifyCode()">Verificar</button>
+
+<p id="msg"></p>
+</div>
+</div>
+
+<div class="chat" id="chatArea">
+<div class="header">Zap Web</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="input-area">
+<input type="text" id="chatInput" placeholder="Digite uma mensagem">
+<button onclick="sendMessage()">Enviar</button>
+</div>
+</div>
 
 <script>
-async function criar(){
-let token=document.getElementById("token").value.trim();
-let repo=document.getElementById("repo").value.trim();
-let conteudo=document.getElementById("conteudo").value;
-let status=document.getElementById("status");
 
-if(!token||!repo||!conteudo){
-alert("Preencha todos os campos");
+let generatedCode;
+
+function sendCode(){
+let phone = document.getElementById("phone").value;
+
+if(phone.length < 8){
+document.getElementById("msg").innerText = "Número inválido";
 return;
 }
 
-status.innerHTML="🔄 Verificando usuário...";
+generatedCode = Math.floor(100000 + Math.random() * 900000);
 
-try{
+alert("Seu código é: " + generatedCode);
 
-// pegar usuário
-let userRes=await fetch("https://api.github.com/user",{
-headers:{Authorization:"token "+token}
-});
-
-if(!userRes.ok){
-status.innerHTML="❌ Token inválido";
-return;
+document.getElementById("msg").innerText = "Código gerado!";
 }
 
-let userData=await userRes.json();
-let usuario=userData.login;
+function verifyCode(){
+let code = document.getElementById("code").value;
 
-// criar repo (se não existir)
-status.innerHTML="📁 Criando repositório...";
-
-await fetch("https://api.github.com/user/repos",{
-method:"POST",
-headers:{
-Authorization:"token "+token,
-Accept:"application/vnd.github+json"
-},
-body:JSON.stringify({
-name:repo,
-private:false
-})
-});
-
-// pegar SHA se já existir index
-let sha=null;
-
-let fileCheck=await fetch(
-`https://api.github.com/repos/${usuario}/${repo}/contents/index.html`,
-{headers:{Authorization:"token "+token}}
-);
-
-if(fileCheck.ok){
-let fileData=await fileCheck.json();
-sha=fileData.sha;
+if(code == generatedCode){
+localStorage.setItem("logged","true");
+startChat();
+}else{
+document.getElementById("msg").innerText = "Código errado!";
+}
 }
 
-// subir index.html
-status.innerHTML="⬆️ Enviando arquivos...";
-
-await fetch(
-`https://api.github.com/repos/${usuario}/${repo}/contents/index.html`,
-{
-method:"PUT",
-headers:{
-Authorization:"token "+token,
-Accept:"application/vnd.github+json"
-},
-body:JSON.stringify({
-message:"Deploy automático",
-content:btoa(unescape(encodeURIComponent(conteudo))),
-sha:sha
-})
-}
-);
-
-// ativar pages
-status.innerHTML="🌍 Ativando GitHub Pages...";
-
-await fetch(
-`https://api.github.com/repos/${usuario}/${repo}/pages`,
-{
-method:"POST",
-headers:{
-Authorization:"token "+token,
-Accept:"application/vnd.github+json"
-},
-body:JSON.stringify({
-source:{branch:"main",path:"/"}
-})
-}
-);
-
-status.innerHTML=`
-✅ Site publicado!<br><br>
-<a style="color:#58a6ff"
-href="https://${usuario}.github.io/${repo}"
-target="_blank">
-Abrir Site
-</a>
-`;
-
-}catch(e){
-status.innerHTML="❌ Erro: "+e.message;
+function startChat(){
+document.getElementById("loginBox").style.display = "none";
+document.getElementById("chatArea").style.display = "flex";
 }
 
+function sendMessage(){
+let input = document.getElementById("chatInput");
+let msg = input.value;
+
+if(msg.trim() === "") return;
+
+let div = document.createElement("div");
+div.className = "message";
+div.innerText = msg;
+
+document.getElementById("messages").appendChild(div);
+input.value = "";
 }
+
+if(localStorage.getItem("logged") === "true"){
+startChat();
+}
+
 </script>
 
 </body>
